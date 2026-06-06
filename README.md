@@ -1,5 +1,7 @@
 # Framework QA Automation — Plateforme de Tourisme Rural
 
+![CI](https://github.com/Zinebfatihi/tourism-rural-QA/actions/workflows/ci.yml/badge.svg)
+
 Framework de tests automatisés pour la plateforme de tourisme rural (frontend React + backend Spring Boot).
 Construit en **Python / Selenium / Pytest** selon le patron **Page Object Model (POM)**.
 
