@@ -1,0 +1,24 @@
+# Secrets et config locale — NE JAMAIS versionner
+.env
+
+# Environnement virtuel Python
+venv/
+.venv/
+env/
+
+# Caches Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Sorties générées (on garde les dossiers via .gitkeep, pas leur contenu)
+reports/*
+screenshots/*
+logs/*
+!reports/.gitkeep
+!screenshots/.gitkeep
+!logs/.gitkeep
+
+# IDE
+.idea/
+.vscode/

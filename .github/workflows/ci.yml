@@ -1,0 +1,42 @@
+# Pipeline CI — Itération 1 : qualité du framework
+#
+# À chaque push et chaque pull request, GitHub Actions :
+#   1. installe Python et les dépendances
+#   2. vérifie que tout le code compile
+#   3. vérifie que Pytest collecte bien tous les tests
+#      (attrape les erreurs d'import, de fixture ou de dépendance)
+#
+# Ce pipeline NE lance PAS les tests Selenium : ceux-ci ont besoin de la
+# plateforme (backend + frontend) démarrée, ce qui sera ajouté à l'itération 2.
+
+name: QA Framework CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    name: Validation du framework
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Vérifier la compilation du code
+        run: python -m compileall pages utilities config conftest.py tests
+
+      - name: Collecter les tests (validation imports et fixtures)
+        run: pytest --collect-only -p no:html
