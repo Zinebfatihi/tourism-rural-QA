@@ -39,4 +39,4 @@ jobs:
         run: python -m compileall pages utilities config conftest.py tests
 
       - name: Collecter les tests (validation imports et fixtures)
-        run: pytest --collect-only -p no:html
+        run: pytest --collect-only
