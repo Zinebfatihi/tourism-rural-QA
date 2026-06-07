@@ -46,6 +46,10 @@ class Config:
     HOST_EMAIL: str = os.getenv("HOST_EMAIL", "fatihizineb88@gmail.com")
     HOST_PASSWORD: str = os.getenv("HOST_PASSWORD", "")
 
+    # Compte touriste de test. Le mot de passe se met dans .env.
+    TOURIST_EMAIL: str = os.getenv("TOURIST_EMAIL", "testtourist@gmail.com")
+    TOURIST_PASSWORD: str = os.getenv("TOURIST_PASSWORD", "")
+
     # --- Dossiers de sortie ---
     REPORTS_DIR: Path = BASE_DIR / "reports"
     SCREENSHOTS_DIR: Path = BASE_DIR / "screenshots"
