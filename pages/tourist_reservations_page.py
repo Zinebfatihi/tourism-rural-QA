@@ -24,6 +24,11 @@ class TouristReservationsPage(BasePage):
         "or contains(text(),'CONFIRMED') or contains(text(),'REJECTED') "
         "or contains(text(),'CANCELLED')]")
 
+    # --- avis (n'apparaît que si la présence a été marquée) ---
+    AVIS_BTN = (By.XPATH, "//button[contains(., 'Avis')]")
+    REVIEW_TEXTAREA = (By.CSS_SELECTOR, "textarea")
+    REVIEW_SUBMIT = (By.XPATH, "//button[contains(., 'Envoyer')]")
+
     def load(self):
         self.open(self.PATH)
         # on attend la fin du « Chargement… » : tableau OU message de liste vide
@@ -40,3 +45,14 @@ class TouristReservationsPage(BasePage):
 
     def has_status_badge(self) -> bool:
         return self.is_visible(self.STATUS_BADGE, timeout=5)
+
+    def has_review_button(self) -> bool:
+        return len(self.driver.find_elements(*self.AVIS_BTN)) > 0
+
+    def leave_review(self, comment: str):
+        """Ouvre la modale d'avis, saisit un commentaire (note 5/5 par défaut)
+        et envoie. Le succès est confirmé par la fermeture de la fenêtre."""
+        self.click(self.AVIS_BTN)
+        self.type(self.REVIEW_TEXTAREA, comment)
+        self.click(self.REVIEW_SUBMIT)
+        self.wait.until(lambda d: not d.find_elements(*self.REVIEW_TEXTAREA))
