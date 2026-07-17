@@ -4,7 +4,12 @@ Page Object de la page admin de validation KYC (/admin/kyc).
 Onglets : « En attente » (SUBMITTED), « Validés », « Refusés ».
 Dans l'onglet « En attente » : soit le message « Aucun document en attente »,
 soit un tableau d'utilisateurs avec un bouton « Procéder » par ligne, qui ouvre
-un panneau latéral contenant le bouton « Valider ».
+un panneau latéral contenant le bouton « Valider » et le bouton « Refuser ».
+
+Flux de rejet : clic « Refuser » -> le panneau bascule en mode refus (textarea
+de motif + boutons « Confirmer le refus » / « Annuler ») -> clic « Confirmer
+le refus » -> la requête part et la liste « En attente » se met à jour
+automatiquement (invalidateQueries côté frontend).
 """
 
 from selenium.webdriver.common.by import By
@@ -22,6 +27,11 @@ class AdminKycPage(BasePage):
     PROCEED_BTN = (By.XPATH, "//button[normalize-space()='Procéder']")
     PENDING_ROWS = (By.CSS_SELECTOR, "table tbody tr")
     VALIDATE_BTN = (By.XPATH, "//button[contains(., 'Valider')]")
+
+    # --- rejet ---
+    REJECT_BTN = (By.XPATH, "//button[contains(., 'Refuser')]")
+    REASON_INPUT = (By.XPATH, "//textarea[contains(@placeholder, 'Motif du refus')]")
+    CONFIRM_REJECT_BTN = (By.XPATH, "//button[contains(., 'Confirmer le refus')]")
 
     def load(self):
         self.open(self.PATH)
@@ -49,5 +59,19 @@ class AdminKycPage(BasePage):
         self.click(self.VALIDATE_BTN)    # valide les documents
 
         # le KYC validé doit quitter la file d'attente
+        self.wait.until(lambda d: email not in self._pending_emails())
+        return email
+
+    def reject_first_pending(self, reason: str = "Documents illisibles (test QA)") -> str:
+        """Rejette le premier KYC en attente, avec motif. Renvoie l'email traité."""
+        rows = self.driver.find_elements(*self.PENDING_ROWS)
+        email = rows[0].find_elements(By.TAG_NAME, "td")[0].text
+
+        self.click(self.PROCEED_BTN)          # ouvre le panneau latéral
+        self.click(self.REJECT_BTN)           # bascule en mode refus
+        self.type(self.REASON_INPUT, reason)  # motif (optionnel côté UI, on le renseigne quand même)
+        self.click(self.CONFIRM_REJECT_BTN)   # confirme
+
+        # le KYC rejeté doit quitter la file d'attente « En attente »
         self.wait.until(lambda d: email not in self._pending_emails())
         return email

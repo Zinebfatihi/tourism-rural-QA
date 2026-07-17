@@ -1,19 +1,31 @@
-# Pipeline CI — Itération 1 : qualité du framework
+# Pipeline CI — Itération 2 : exécution réelle des tests Selenium
 #
 # À chaque push et chaque pull request, GitHub Actions :
-#   1. installe Python et les dépendances
-#   2. vérifie que tout le code compile
-#   3. vérifie que Pytest collecte bien tous les tests
-#      (attrape les erreurs d'import, de fixture ou de dépendance)
+#   1. valide le framework QA (compilation + collecte, comme avant)
+#   2. démarre une base MySQL éphémère (service container)
+#   3. récupère et démarre le backend Spring Boot (repo séparé)
+#   4. récupère et démarre le frontend React/Vite (repo séparé)
+#   5. exécute la suite de tests Selenium en mode headless
+#   6. publie le rapport HTML et les captures d'écran comme artefacts
 #
-# Ce pipeline NE lance PAS les tests Selenium : ceux-ci ont besoin de la
-# plateforme (backend + frontend) démarrée, ce qui sera ajouté à l'itération 2.
+# Secrets requis à configurer dans Settings > Secrets and variables > Actions
+# du repo QA (Settings > Secrets and variables > Actions > New repository secret) :
+#   - MAIL_USER            (peut être une valeur factice, ex: test@example.com)
+#   - MAIL_PASS            (peut être une valeur factice)
+#   - STRIPE_SECRET_KEY    (peut être une valeur factice, ex: sk_test_dummy)
+#   - STRIPE_WEBHOOK       (peut être une valeur factice, ex: whsec_dummy)
+#
+# Ces 4 variables ne sont lues qu'au démarrage de Spring (résolution de
+# placeholder) : l'application démarre très bien avec des valeurs factices,
+# tant qu'aucun test ne déclenche un vrai envoi d'email ou un vrai paiement
+# Stripe (ce qui n'est pas le cas de la suite actuelle).
 
 name: QA Framework CI
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   validate:
@@ -40,3 +52,133 @@ jobs:
 
       - name: Collecter les tests (validation imports et fixtures)
         run: pytest --collect-only
+
+  e2e:
+    name: Exécution Selenium (smoke)
+    runs-on: ubuntu-latest
+    needs: validate
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: "ZINEB123zineb"   # doit matcher application.yml du backend
+          MYSQL_DATABASE: tourismedb
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pZINEB123zineb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      # ---------- Récupération des 3 dépôts ----------
+      - name: Récupérer le repo QA
+        uses: actions/checkout@v4
+        with:
+          path: qa
+
+      - name: Récupérer le repo backend
+        uses: actions/checkout@v4
+        with:
+          repository: noussairox/tourisme-rural-backend
+          path: backend
+
+      - name: Récupérer le repo frontend
+        uses: actions/checkout@v4
+        with:
+          repository: noussairox/tourisme-rural-frontend
+          path: frontend
+
+      # ---------- Backend : build & run en tâche de fond ----------
+      - name: Installer Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Démarrer le backend Spring Boot
+        working-directory: backend/tourisme-rural-backend
+        env:
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK: ${{ secrets.STRIPE_WEBHOOK }}
+        run: |
+          chmod +x mvnw
+          nohup ./mvnw -q spring-boot:run > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          echo "Attente du démarrage du backend sur :8080..."
+          for i in $(seq 1 40); do
+            if curl -s http://localhost:8080/ > /dev/null; then
+              echo "Backend prêt."
+              break
+            fi
+            sleep 5
+          done
+
+      # ---------- Frontend : install & run en tâche de fond ----------
+      - name: Installer Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Démarrer le frontend Vite
+        working-directory: frontend
+        run: |
+          npm ci
+          nohup npm run dev -- --port 5173 --host > "$GITHUB_WORKSPACE/frontend.log" 2>&1 &
+          echo "Attente du démarrage du frontend sur :5173..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5173 > /dev/null; then
+              echo "Frontend prêt."
+              break
+            fi
+            sleep 3
+          done
+
+      # ---------- Tests Selenium ----------
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances QA
+        working-directory: qa
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lancer la suite Smoke en headless
+        working-directory: qa
+        env:
+          HEADLESS: "true"
+          BASE_URL: "http://localhost:5173"
+          ADMIN_EMAIL: "admin@saih.com"
+          ADMIN_PASSWORD: "Admin123!"
+        run: pytest -m smoke
+
+      # ---------- Diagnostic en cas d'échec ----------
+      - name: Afficher les logs backend/frontend en cas d'échec
+        if: failure()
+        run: |
+          echo "=== backend.log ==="
+          tail -n 200 backend.log || true
+          echo "=== frontend.log ==="
+          tail -n 200 frontend.log || true
+
+      # ---------- Artefacts ----------
+      - name: Publier le rapport HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-html-report
+          path: qa/reports/report.html
+
+      - name: Publier les captures d'écran
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-screenshots
+          path: qa/screenshots/
