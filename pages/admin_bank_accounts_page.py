@@ -69,7 +69,7 @@ class AdminBankAccountsPage(BasePage):
         """
         self.click(self._delete_btn(rib))
         time.sleep(1)
-        self.driver.refr  esh()
+        self.driver.refresh()
         self.find(self.TITLE)
         self.wait.until(lambda d: not d.find_elements(*self._row_cell(rib)))
 
