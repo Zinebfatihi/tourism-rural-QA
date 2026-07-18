@@ -126,7 +126,7 @@ jobs:
       - name: Démarrer le frontend Vite
         working-directory: frontend
         run: |
-          npm ci
+          npm ci --legacy-peer-deps
           nohup npm run dev -- --port 5173 --host > "$GITHUB_WORKSPACE/frontend.log" 2>&1 &
           echo "Attente du démarrage du frontend sur :5173..."
           for i in $(seq 1 30); do
