@@ -105,13 +105,19 @@ jobs:
           MAIL_PASS: ${{ secrets.MAIL_PASS }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK: ${{ secrets.STRIPE_WEBHOOK }}
+          # Forcés explicitement : une variable d'environnement a toujours
+          # priorité sur application.yml en Spring Boot. Ça contourne le
+          # souci observé où le mot de passe du yml n'était pas appliqué
+          # (le driver MySQL recevait un mot de passe vide malgré le yml).
+          SPRING_DATASOURCE_URL: "jdbc:mysql://localhost:3306/tourismedb"
+          SPRING_DATASOURCE_USERNAME: "root"
+          SPRING_DATASOURCE_PASSWORD: "ZINEB123zineb"
         run: |
           chmod +x mvnw
           # On construit un vrai .jar et on le lance directement, plutôt que
           # d'utiliser "mvnw spring-boot:run" : cette dernière commande active
           # Spring Boot DevTools, dont le redémarrage à chaud automatique est
-          # instable en CI (il peut redémarrer l'appli à un mauvais moment et
-          # perdre la config de connexion à la base — vécu en pratique).
+          # instable en CI.
           ./mvnw -q -DskipTests package
           JAR_FILE=$(ls target/*.jar | grep -v '\.original' | head -n 1)
           echo "Lancement de : $JAR_FILE"
