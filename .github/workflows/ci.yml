@@ -107,7 +107,15 @@ jobs:
           STRIPE_WEBHOOK: ${{ secrets.STRIPE_WEBHOOK }}
         run: |
           chmod +x mvnw
-          nohup ./mvnw -q spring-boot:run > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          # On construit un vrai .jar et on le lance directement, plutôt que
+          # d'utiliser "mvnw spring-boot:run" : cette dernière commande active
+          # Spring Boot DevTools, dont le redémarrage à chaud automatique est
+          # instable en CI (il peut redémarrer l'appli à un mauvais moment et
+          # perdre la config de connexion à la base — vécu en pratique).
+          ./mvnw -q -DskipTests package
+          JAR_FILE=$(ls target/*.jar | grep -v '\.original' | head -n 1)
+          echo "Lancement de : $JAR_FILE"
+          nohup java -jar "$JAR_FILE" > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
           echo "Attente du démarrage du backend sur :8080..."
           for i in $(seq 1 40); do
             if curl -s http://localhost:8080/ > /dev/null; then
