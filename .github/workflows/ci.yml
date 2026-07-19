@@ -116,6 +116,11 @@ jobs:
             fi
             sleep 5
           done
+          # Délai de "chauffe" supplémentaire : le premier appel API après
+          # démarrage (pool de connexions DB, JIT) reste lent quelques
+          # secondes de plus même une fois le port ouvert.
+          echo "Chauffe du backend (15s)..."
+          sleep 15
 
       # ---------- Frontend : install & run en tâche de fond ----------
       - name: Installer Node 20
@@ -157,6 +162,7 @@ jobs:
           BASE_URL: "http://localhost:5173"
           ADMIN_EMAIL: "admin@saih.com"
           ADMIN_PASSWORD: "Admin123!"
+          EXPLICIT_WAIT: "25"
         run: pytest -m smoke
 
       # ---------- Diagnostic en cas d'échec ----------
