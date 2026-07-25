@@ -50,6 +50,9 @@ class AdminKycPage(BasePage):
     def _pending_emails(self):
         return [r.text for r in self.driver.find_elements(*self.PENDING_ROWS)]
 
+    def _row_for_email(self, email: str):
+        return (By.XPATH, f"//tr[.//td[normalize-space()=\"{email}\"]]")
+
     def validate_first_pending(self) -> str:
         """Valide le premier KYC en attente. Renvoie l'email traité."""
         rows = self.driver.find_elements(*self.PENDING_ROWS)
@@ -75,3 +78,19 @@ class AdminKycPage(BasePage):
         # le KYC rejeté doit quitter la file d'attente « En attente »
         self.wait.until(lambda d: email not in self._pending_emails())
         return email
+
+    def reject_by_email(self, email: str, reason: str = "Documents illisibles (test QA)"):
+        """Rejette précisément la ligne correspondant à `email` (et non la
+        première ligne trouvée), utile dans un environnement partagé où
+        plusieurs KYC peuvent être en attente en même temps."""
+        rows = self.driver.find_elements(*self._row_for_email(email))
+        if not rows:
+            raise ValueError(f"Aucun KYC en attente trouvé pour {email}.")
+
+        proceed_btn = rows[0].find_element(By.XPATH, ".//button[normalize-space()='Procéder']")
+        proceed_btn.click()
+        self.click(self.REJECT_BTN)
+        self.type(self.REASON_INPUT, reason)
+        self.click(self.CONFIRM_REJECT_BTN)
+
+        self.wait.until(lambda d: email not in self._pending_emails())
